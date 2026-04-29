@@ -206,6 +206,18 @@ def extract_images(config: ExtractConfig, output_dir: str | None = None) -> Extr
         for col in cols_needed:
             cell_cache[(row, col)] = _get_cell_value(ws, row, col)
 
+    # 预读所有数据行的名称和前缀（用于生成有名无图报告）
+    all_name_cache = {}
+    all_prefix_cache = {}
+    for row in range(header_row + 1, ws.max_row + 1):
+        val = _get_cell_value(ws, row, config.name_col)
+        if val:
+            all_name_cache[row] = val
+        if config.prefix_col:
+            pval = _get_cell_value(ws, row, config.prefix_col)
+            if pval:
+                all_prefix_cache[row] = pval
+
     # 构建文件名列表（同时保留图片数据和原始名称）
     image_data_pairs = []
     raw_names = []
@@ -283,6 +295,125 @@ def extract_images(config: ExtractConfig, output_dir: str | None = None) -> Extr
                 writer.writerow([original, exported])
         errors.insert(0, f"[成功] 已生成 mapping.csv（共 {len(name_mapping)} 条记录），已包含在ZIP包中")
         print(f"[DEBUG] mapping.csv generated: {mapping_path}, rows={len(name_mapping)}")
+
+    # 生成 report.xlsx（有名无图 / 有图无名 / 有图有名）
+    report_path = os.path.join(extract_dir, "report.xlsx")
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
+        wb_report = Workbook()
+
+        # 提取有图片的行号集合（用于有名无图判断）
+        image_rows = set(t[0] for t in target_images)
+
+        # 准备表头样式
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill("solid", fgColor="4472C4")
+        header_align = Alignment(horizontal="center", vertical="center")
+        thin_border = Border(
+            left=Side(style="thin"), right=Side(style="thin"),
+            top=Side(style="thin"), bottom=Side(style="thin")
+        )
+
+        def _style_header(cell):
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            cell.border = thin_border
+
+        def _style_cell(cell):
+            cell.border = thin_border
+            cell.alignment = Alignment(horizontal="left", vertical="center")
+
+        # ---- Sheet 1: 有名无图 ----
+        ws1 = wb_report.active
+        ws1.title = "有名无图"
+        ws1.append(["行号", "商品名称", "前缀"])
+        for h_cell in ws1[1]:
+            _style_header(h_cell)
+
+        no_image_rows = []
+        for row in range(header_row + 1, ws.max_row + 1):
+            name_val = all_name_cache.get(row)
+            if name_val and row not in image_rows:
+                prefix_val = all_prefix_cache.get(row, "")
+                no_image_rows.append((row, name_val, prefix_val))
+
+        for row_data in no_image_rows:
+            ws1.append(row_data)
+        for row in ws1.iter_rows(min_row=2, max_row=ws1.max_row):
+            for cell in row:
+                _style_cell(cell)
+        ws1.column_dimensions["A"].width = 10
+        ws1.column_dimensions["B"].width = 40
+        ws1.column_dimensions["C"].width = 20
+
+        # ---- Sheet 2: 有图无名 ----
+        ws2 = wb_report.create_sheet(title="有图无名")
+        ws2.append(["行号", "图片列", "图片扩展名", "覆盖行范围", "覆盖列范围"])
+        for h_cell in ws2[1]:
+            _style_header(h_cell)
+
+        no_name_images = []
+        for (row, col, ext, img, img_data, to_row, to_col) in target_images:
+            name_value = cell_cache.get((row, config.name_col))
+            if not name_value and to_row > row:
+                for r in range(row, to_row + 1):
+                    name_value = _get_cell_value(ws, r, config.name_col)
+                    if name_value:
+                        break
+            if not name_value:
+                no_name_images.append((row, col, ext, f"{row}-{to_row}", f"{col}-{to_col}"))
+
+        for row_data in no_name_images:
+            ws2.append(row_data)
+        for row in ws2.iter_rows(min_row=2, max_row=ws2.max_row):
+            for cell in row:
+                _style_cell(cell)
+        ws2.column_dimensions["A"].width = 10
+        ws2.column_dimensions["B"].width = 12
+        ws2.column_dimensions["C"].width = 15
+        ws2.column_dimensions["D"].width = 18
+        ws2.column_dimensions["E"].width = 18
+
+        # ---- Sheet 3: 有图有名 ----
+        ws3 = wb_report.create_sheet(title="有图有名")
+        ws3.append(["行号", "商品名称", "前缀", "导出文件名", "图片扩展名"])
+        for h_cell in ws3[1]:
+            _style_header(h_cell)
+
+        has_name_images = []
+        for idx, (row, col, ext, img, img_data, to_row, to_col) in enumerate(target_images):
+            name_value = cell_cache.get((row, config.name_col))
+            if not name_value and to_row > row:
+                for r in range(row, to_row + 1):
+                    name_value = _get_cell_value(ws, r, config.name_col)
+                    if name_value:
+                        break
+            if name_value:
+                field_prefix = ""
+                if config.prefix_col:
+                    field_prefix = cell_cache.get((row, config.prefix_col)) or ""
+                final_filename = filenames[idx]
+                has_name_images.append((row, name_value, field_prefix, final_filename, ext))
+
+        for row_data in has_name_images:
+            ws3.append(row_data)
+        for row in ws3.iter_rows(min_row=2, max_row=ws3.max_row):
+            for cell in row:
+                _style_cell(cell)
+        ws3.column_dimensions["A"].width = 10
+        ws3.column_dimensions["B"].width = 40
+        ws3.column_dimensions["C"].width = 20
+        ws3.column_dimensions["D"].width = 40
+        ws3.column_dimensions["E"].width = 15
+
+        wb_report.save(report_path)
+        errors.insert(0, f"[成功] 已生成 report.xlsx（有名无图 {len(no_image_rows)} 条，有图无名 {len(no_name_images)} 条，有图有名 {len(has_name_images)} 条）")
+        print(f"[DEBUG] report.xlsx generated: {report_path}")
+    except Exception as e:
+        errors.append(f"[警告] 生成 report.xlsx 失败: {str(e)}")
 
     # 关闭资源
     xlsx_zip.close()
