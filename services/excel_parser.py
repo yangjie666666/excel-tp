@@ -221,33 +221,17 @@ def get_cell_value(file_path: str, sheet_name: str, row: int, col: int) -> str |
 
 
 def _get_image_extension(img) -> str:
-    """获取图片的扩展名"""
+    """获取图片的扩展名（不读取图片数据，避免服务器上句柄问题）"""
     # 尝试从图片格式获取
     if hasattr(img, 'format') and img.format:
         return img.format.lower()
 
-    # 从图片数据头部判断格式
-    try:
-        data = img._data()
-        if data[:8] == b'\x89PNG\r\n\x1a\n':
-            return 'png'
-        elif data[:2] == b'\xff\xd8':
-            return 'jpg'
-        elif data[:4] == b'RIFF' and data[8:12] == b'WEBP':
-            return 'webp'
-        elif data[:6] in (b'GIF87a', b'GIF89a'):
-            return 'gif'
-        elif data[:4] == b'\x00\x00\x01\x00':
-            return 'ico'
-        elif data[:2] == b'BM':
-            return 'bmp'
-        # EMF/WMF - WPS常用格式
-        elif data[:4] == b'\x01\x00\x00\x00':
-            return 'emf'
-        elif data[:4] == b'\xd7\xcd\xc6\x9a':
-            return 'wmf'
-    except Exception:
-        pass
+    # 从 img.path 的后缀猜测
+    path = getattr(img, 'path', '')
+    if path:
+        ext = os.path.splitext(path)[1].lower().lstrip('.')
+        if ext in ('png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'ico', 'emf', 'wmf'):
+            return ext if ext != 'jpeg' else 'jpg'
 
     # 默认png
     return 'png'
