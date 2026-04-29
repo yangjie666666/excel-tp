@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel 图片提取</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+      /* Fallback: 确保基础布局不崩 */
+      body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; font-size:14px; line-height:1.6; color:#1a1a1a; background:#f3f2ef; margin:0; }
+      .app { min-height:100vh; display:flex; flex-direction:column; }
+      .topbar { padding:20px 24px; }
+      .topbar-inner { max-width:720px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
+      .brand { display:flex; align-items:center; gap:10px; font-size:18px; font-weight:600; }
+      .workspace { max-width:720px; margin:0 auto; width:100%; padding:0 24px 48px; display:flex; flex-direction:column; gap:16px; }
+      .panel { background:#fff; border-radius:14px; padding:28px; box-shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.04); }
+      .panel.disabled { opacity:.4; pointer-events:none; }
+      .panel.hidden { display:none; }
+      .panel-head { display:flex; align-items:flex-start; gap:14px; margin-bottom:20px; }
+      .panel-num { width:28px; height:28px; border-radius:50%; background:#c45d3e; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:600; flex-shrink:0; }
+      .panel.disabled .panel-num { background:#e5e3df; color:#8a8a8a; }
+      .panel-title { font-size:20px; font-weight:600; line-height:1.3; margin:0; }
+      .panel-desc { font-size:13px; color:#8a8a8a; margin-top:2px; }
+      .dropzone { border:2px dashed #e5e3df; border-radius:10px; padding:44px 32px; text-align:center; cursor:pointer; background:#f3f2ef; }
+      .dropzone:hover { border-color:#c45d3e; background:#fdf0ec; }
+      .dropzone-visual { display:flex; flex-direction:column; align-items:center; gap:14px; }
+      .dropzone-icon { width:52px; height:52px; border-radius:50%; background:#fff; display:flex; align-items:center; justify-content:center; color:#c45d3e; }
+      .dropzone-title { font-size:15px; font-weight:600; }
+      .dropzone-sub { font-size:13px; color:#8a8a8a; }
+      .file-chip { display:flex; align-items:center; gap:8px; margin-top:16px; padding:10px 14px; background:#e8f5ee; border-radius:10px; font-size:13px; color:#2d6a4f; font-weight:500; }
+      .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+      .field { display:flex; flex-direction:column; gap:6px; margin-bottom:0; }
+      .field-label { font-size:12px; font-weight:700; color:#4a4a4a; text-transform:uppercase; letter-spacing:.05em; }
+      .field-label .req { color:#c45d3e; }
+      .control { width:100%; padding:10px 12px; border:1.5px solid #e5e3df; border-radius:10px; font-size:14px; color:#1a1a1a; background:#fff; }
+      .static-field { padding:10px 12px; border:1.5px solid #f0eeeb; border-radius:10px; font-size:14px; color:#8a8a8a; background:#f3f2ef; min-height:40px; display:flex; align-items:center; }
+      .fold { border:1.5px solid #e5e3df; border-radius:10px; overflow:hidden; }
+      .fold-trigger { padding:12px 14px; font-size:13px; font-weight:600; color:#4a4a4a; cursor:pointer; list-style:none; display:flex; align-items:center; gap:8px; }
+      .fold-icon { width:20px; height:20px; border-radius:50%; background:#fdf0ec; color:#c45d3e; display:flex; align-items:center; justify-content:center; }
+      .preview { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#f3f2ef; border-radius:10px; font-size:13px; }
+      .preview-label { font-size:11px; font-weight:700; color:#c45d3e; background:#fdf0ec; padding:3px 8px; border-radius:4px; }
+      .preview-code { font-family:monospace; color:#4a4a4a; word-break:break-all; }
+      .panel-actions { display:flex; gap:12px; margin-top:8px; }
+      .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 20px; border-radius:10px; font-size:14px; font-weight:600; border:none; cursor:pointer; text-decoration:none; }
+      .btn-primary { background:#c45d3e; color:#fff; }
+      .btn-text { background:transparent; color:#8a8a8a; }
+      .progress { display:flex; align-items:center; gap:12px; padding:14px; background:#fdf0ec; border-radius:10px; }
+      .progress-track { flex:1; height:4px; background:rgba(196,93,62,.15); border-radius:2px; overflow:hidden; }
+      .progress-bar { height:100%; width:0%; background:#c45d3e; border-radius:2px; transition:width .4s ease; }
+      .progress-label { font-size:12px; font-weight:600; color:#c45d3e; white-space:nowrap; }
+      .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+      .stat { text-align:center; padding:22px 12px; border-radius:10px; background:#f3f2ef; border:1.5px solid #f0eeeb; }
+      .stat-value { display:block; font-size:32px; font-weight:700; line-height:1; }
+      .stat-name { display:block; font-size:12px; color:#8a8a8a; margin-top:6px; }
+      .error-box { background:#fef2f2; border:1.5px solid #fecaca; border-radius:10px; padding:14px; max-height:200px; overflow-y:auto; }
+      .error-box p { font-size:13px; color:#b91c1c; margin-bottom:4px; }
+      @media (max-width:640px){ .workspace{padding:0 16px 32px;} .panel{padding:20px;} .form-row{grid-template-columns:1fr;} .stats{grid-template-columns:1fr;} .panel-actions{flex-direction:column;} }
+    </style>
+</head>
+<body>
+
+<div class="app">
+
+    <!-- ═══ 顶栏 ═══ -->
+    <header class="topbar">
+        <div class="topbar-inner">
+            <div class="brand">
+                <svg class="brand-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2.5"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                    <path d="m21 15-5-5L5 21"/>
+                </svg>
+                <span class="brand-text">Excel 图片提取</span>
+            </div>
+            <span class="badge-local">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                本地处理
+            </span>
+        </div>
+    </header>
+
+    <main class="workspace">
+
+        <!-- ═══ 1 · 上传 ═══ -->
+        <section class="panel" id="sec-upload">
+            <div class="panel-head">
+                <span class="panel-num">1</span>
+                <div>
+                    <h2 class="panel-title">上传 Excel 文件</h2>
+                    <p class="panel-desc">拖入文件或点击选择，支持 .xlsx 和 .xls</p>
+                </div>
+            </div>
+
+            <div class="dropzone" id="upload-area" role="button" tabindex="0" aria-label="上传Excel文件">
+                <div class="dropzone-visual">
+                    <div class="dropzone-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <p class="dropzone-title">点击或拖拽上传</p>
+                    <p class="dropzone-sub">最大支持 1GB</p>
+                </div>
+                <input type="file" id="file-input" accept=".xlsx,.xls" hidden>
+            </div>
+
+            <div class="file-chip" id="file-chip" hidden>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                <span id="file-chip-text"></span>
+            </div>
+
+            <div class="progress" id="upload-progress" hidden>
+                <div class="progress-track"><div class="progress-bar" id="upload-fill"></div></div>
+                <span class="progress-label" id="upload-text">上传中…</span>
+            </div>
+        </section>
+
+        <!-- ═══ 2 · 配置 ═══ -->
+        <section class="panel disabled" id="sec-config">
+            <div class="panel-head">
+                <span class="panel-num">2</span>
+                <div>
+                    <h2 class="panel-title">配置列映射</h2>
+                    <p class="panel-desc">选择图片所在列和商品名称列</p>
+                </div>
+            </div>
+
+            <div class="panel-body">
+                <div class="form-row">
+                    <div class="field">
+                        <label class="field-label" for="sheet-select">工作表</label>
+                        <select id="sheet-select" class="control"></select>
+                    </div>
+                    <div class="field">
+                        <label class="field-label">图片数量</label>
+                        <div class="static-field" id="image-info">请上传文件</div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="field">
+                        <label class="field-label" for="image-col-select">图片所在列 <span class="req">*</span></label>
+                        <select id="image-col-select" class="control"></select>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="name-col-select">商品名称列 <span class="req">*</span></label>
+                        <select id="name-col-select" class="control"></select>
+                    </div>
+                </div>
+
+                <details class="fold">
+                    <summary class="fold-trigger">
+                        <svg class="fold-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                            <line x1="12" y1="5" x2="12" y2="19"/>
+                            <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        前缀设置（可选）
+                    </summary>
+                    <div class="fold-body">
+                        <div class="form-row">
+                            <div class="field">
+                                <label class="field-label" for="prefix-col-select">取自某列的值</label>
+                                <select id="prefix-col-select" class="control"></select>
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="manual-prefix">手动输入</label>
+                                <input type="text" id="manual-prefix" class="control" placeholder="例如：A店-">
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <div class="preview" id="naming-preview" hidden>
+                    <span class="preview-label">预览</span>
+                    <code class="preview-code" id="preview-example"></code>
+                </div>
+
+                <div class="panel-actions">
+                    <button id="btn-extract" class="btn btn-primary" disabled>开始提取</button>
+                    <button id="btn-reupload" class="btn btn-text">重新上传</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ 3 · 结果 ═══ -->
+        <section class="panel hidden" id="sec-result">
+            <div class="panel-head">
+                <span class="panel-num">3</span>
+                <div>
+                    <h2 class="panel-title">提取结果</h2>
+                    <p class="panel-desc" id="result-desc">处理完成</p>
+                </div>
+            </div>
+
+            <div class="panel-body">
+                <div class="progress" id="extract-progress" hidden>
+                    <div class="progress-track"><div class="progress-bar" id="extract-fill"></div></div>
+                    <span class="progress-label" id="extract-text">提取中…</span>
+                </div>
+
+                <div class="stats" id="result-stats" hidden>
+                    <div class="stat">
+                        <span class="stat-value" id="stat-extracted">0</span>
+                        <span class="stat-name">成功提取</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="stat-skipped">0</span>
+                        <span class="stat-name">跳过</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value" id="stat-total">0</span>
+                        <span class="stat-name">总计</span>
+                    </div>
+                </div>
+
+                <div class="error-box" id="error-list" hidden></div>
+
+                <div class="panel-actions" id="download-actions" hidden>
+                    <a id="btn-download" class="btn btn-primary" href="#">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        下载 ZIP
+                    </a>
+                    <button id="btn-restart" class="btn btn-text">提取另一个文件</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific - temp files and user data
+temp/
+*.xlsx
+*.xls
+~$*
+
+# Excluded folders
+.codex/
+web_v2/
+.learnings/
+
+# Flask
+instance/
