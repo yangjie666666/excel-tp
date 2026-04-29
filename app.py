@@ -6,7 +6,7 @@ import uuid
 import shutil
 import tempfile
 
-from flask import Flask, render_template, request, jsonify, send_file, session, redirect
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, render_template_string
 from werkzeug.utils import secure_filename
 
 from services.excel_parser import (
